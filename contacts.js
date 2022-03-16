@@ -12,13 +12,11 @@ const hubspotClient = new hubspot.Client({
   apiKey: apiKey,
 });
 
-var contacts_storage = [];
-
-async function getContacts(properties) {
-  console.log(properties);
+async function getContacts() {
+  const limit = 100;
   return await hubspotClient.apiRequest({
     method: "GET",
-    path: `/crm/v3/objects/contacts?limit=10&associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/contacts?limit=${limit}&associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
   });
 }
 
@@ -40,20 +38,6 @@ async function readEmail(emailID) {
   return await hubspotClient.apiRequest({
     method: "GET",
     path: `/crm/v3/objects/emails/${emailID}?properties=hs_email_text&archived=false&hapikey=${apiKey}`,
-  });
-}
-
-async function getProperties() {
-  return await hubspotClient.apiRequest({
-    method: "GET",
-    path: `/crm/v3/properties/contact?archived=false&hapikey=${apiKey}`,
-  });
-}
-
-async function cleanProperties() {
-  const properties = await getProperties();
-  return properties.results.map((result) => {
-    return result.name;
   });
 }
 
@@ -113,8 +97,7 @@ function flattenObject(ob) {
 }
 
 async function fillUpContacts() {
-  const properties = await getProperties();
-  const contacts = await getContacts(properties);
+  const contacts = await getContacts();
   const promises = contacts.results.map(async (result) => {
     // Associations
     if (!!result.associations && !!result.associations.notes) {
@@ -140,9 +123,9 @@ async function fillUpContacts() {
 }
 
 fillUpContacts().then((contacts) => {
-  // console.log(
-  //   util.inspect(contacts, { showHidden: false, depth: null, colors: true })
-  // );
+  console.log(
+    util.inspect(contacts, { showHidden: false, depth: null, colors: true })
+  );
 
   const csv = convertArrayToCSV(contacts);
   try {
