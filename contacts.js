@@ -103,7 +103,7 @@ async function getProperties() {
   });
 }
 
-async function cleanProperties() {
+async function getCleanProperties() {
   const properties = await getProperties();
   return properties.results.map((result) => {
     return result.name;
@@ -166,49 +166,54 @@ function flattenObject(ob) {
 }
 
 async function fillUpContacts() {
-  const properties = await getProperties();
-  const contacts = await getContacts(properties);
-  const promises = contacts.results.map(async (result) => {
-    // Associations
-    if (!!result.associations && !!result.associations.notes) {
-      result.notes = await getNotes(result.associations.notes.results);
-    }
-    if (!!result.associations && !!result.associations.calls) {
-      result.calls = await getCalls(result.associations.calls.results);
-    }
-    if (!!result.associations && !!result.associations.emails) {
-      result.emails = await getEmails(result.associations.emails.results);
-    }
-
-    // Remove unused keys
-    delete result.properties.createdate;
-    delete result.properties.lastmodifieddate;
-    delete result.properties.hs_object_id;
-    delete result.associations;
-    delete result.archived;
-
-    return flattenObject(result);
-  });
-  return Promise.all(promises);
+  const properties = await getCleanProperties();
+  // const contacts = await getContacts(properties.join('%2C'));
+  // const contacts = await searchContacts(properties);
+  const contacts = await getBasicContacts(properties);
+  console.log(
+    util.inspect(contacts, { showHidden: false, depth: null, colors: true })
+  );
+  // const promises = contacts.results.map(async (result) => {
+  //   // Associations
+  //   if (!!result.associations && !!result.associations.notes) {
+  //     result.notes = await getNotes(result.associations.notes.results);
+  //   }
+  //   if (!!result.associations && !!result.associations.calls) {
+  //     result.calls = await getCalls(result.associations.calls.results);
+  //   }
+  //   if (!!result.associations && !!result.associations.emails) {
+  //     result.emails = await getEmails(result.associations.emails.results);
+  //   }
+  //
+  //   // Remove unused keys
+  //   delete result.properties.createdate;
+  //   delete result.properties.lastmodifieddate;
+  //   delete result.properties.hs_object_id;
+  //   delete result.associations;
+  //   delete result.archived;
+  //
+  //   return flattenObject(result);
+  // });
+  // return Promise.all(promises);
 }
-
-fillUpContacts().then((contacts) => {
-  // console.log(
-  //   util.inspect(contacts, { showHidden: false, depth: null, colors: true })
-  // );
-
-  const csv = convertArrayToCSV(contacts);
-  try {
-    fs.writeFileSync(
-      exportPath,
-      csv,
-      {
-        flag: "w+",
-      },
-      (err) => {}
-    );
-    //file written successfully
-  } catch (err) {
-    console.error(err);
-  }
-});
+fillUpContacts();
+// fillUpContacts().then((contacts) => {
+//   console.log(
+//     util.inspect(contacts, { showHidden: false, depth: null, colors: true })
+//   );
+//
+//   const csv = convertArrayToCSV(contacts);
+//   try {
+//     fs.writeFileSync(
+//       exportPath,
+//       csv,
+//       {
+//         flag: "w+",
+//       },
+//       (err) => {}
+//     );
+//     //file written successfully
+//   } catch (err) {
+//     console.error(err);
+//   }
+// });
