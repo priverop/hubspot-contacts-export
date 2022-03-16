@@ -13,7 +13,7 @@ const hubspotClient = new hubspot.Client({
 });
 
 async function getContacts() {
-  const limit = 100;
+  const limit = 10;
   return await hubspotClient.apiRequest({
     method: "GET",
     path: `/crm/v3/objects/contacts?limit=${limit}&associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
