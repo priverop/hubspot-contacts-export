@@ -1,0 +1,17 @@
+{
+  "name": "Hubspot Full Contacts Exporter",
+  "version": "1.0.0",
+  "description": "Easy export every contact you have with associations",
+  "main": "index.js",
+  "keywords": "hubspot,api,export,nodejs,javascript",
+  "dependencies": {
+    "@hubspot/api-client": "^6.0.1-beta3",
+    "convert-array-to-csv": "^2.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Pablo Rivero",
+  "license": "MIT"
+}
