@@ -53,8 +53,7 @@ async function getProperties() {
 async function cleanProperties() {
   const properties = await getProperties();
   return properties.results.map((result) => {
-    return;
-    name: result.name;
+    return result.name;
   });
 }
 
