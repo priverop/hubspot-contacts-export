@@ -12,13 +12,66 @@ const hubspotClient = new hubspot.Client({
   apiKey: apiKey,
 });
 
-var contacts_storage = [];
+/*
+  Search without query. It ONLY returns the properties.
+*/
 
+async function searchContacts(properties) {
+  const filter = {
+    propertyName: "createdate",
+    operator: "GTE",
+    value: Date.now() - 30 * 60000,
+  };
+  const filterGroup = { filters: [filter] };
+  const sort = JSON.stringify({
+    propertyName: "createdate",
+    direction: "DESCENDING",
+  });
+  const query = "";
+  const limit = 10;
+  const after = 0;
+
+  const publicObjectSearchRequest = {
+    filterGroups: [filterGroup],
+    sorts: [sort],
+    query,
+    properties,
+    limit,
+    after,
+  };
+
+  return await hubspotClient.crm.contacts.searchApi.doSearch(
+    publicObjectSearchRequest
+  );
+}
+
+/*
+ * Get contacts using the basicApi.
+*/
+
+async function getBasicContacts(properties) {
+  const limit = 10;
+  const after = 0;
+  const archived = false;
+  const associations = ['calls', 'notes', 'emails'];
+
+  return hubspotClient.crm.contacts.basicApi.getPage(
+    limit,
+    after,
+    properties,
+    associations,
+    archived
+  );
+}
+
+/*
+  Get Contacts with standard api request.
+  414 URI too long
+*/
 async function getContacts(properties) {
-  console.log(properties);
   return await hubspotClient.apiRequest({
     method: "GET",
-    path: `/crm/v3/objects/contacts?limit=10&associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/contacts?limit=100&properties=${properties}&associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
   });
 }
 
