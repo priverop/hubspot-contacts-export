@@ -4,9 +4,10 @@ const util = require("util");
 const converter = require("convert-array-to-csv");
 const hubspot = require("@hubspot/api-client");
 
-// MODIFY
+// CONFIGURATION
 const apiKey = "";
 const exportPath = "";
+const importPath = "";
 
 const hubspotClient = new hubspot.Client({
   apiKey: apiKey,
@@ -20,24 +21,39 @@ async function getContacts() {
   });
 }
 
-async function readCall(callID) {
+async function readContact(contact_id) {
+  if (contact_id === "") return false;
+
   return await hubspotClient.apiRequest({
     method: "GET",
-    path: `/crm/v3/objects/calls/${callID}?archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/contacts/${contact_id}?associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
   });
 }
 
-async function readNote(noteID) {
+async function readCall(call_id) {
+  if (call_id === "") return false;
+
   return await hubspotClient.apiRequest({
     method: "GET",
-    path: `/crm/v3/objects/notes/${noteID}?properties=hs_note_body&archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/calls/${call_id}?archived=false&hapikey=${apiKey}`,
   });
 }
 
-async function readEmail(emailID) {
+async function readNote(note_id) {
+  if (note_id === "") return false;
+
   return await hubspotClient.apiRequest({
     method: "GET",
-    path: `/crm/v3/objects/emails/${emailID}?properties=hs_email_text&archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/notes/${note_id}?properties=hs_note_body&archived=false&hapikey=${apiKey}`,
+  });
+}
+
+async function readEmail(email_id) {
+  if (email_id === "") return false;
+
+  return await hubspotClient.apiRequest({
+    method: "GET",
+    path: `/crm/v3/objects/emails/${email_id}?properties=hs_email_text&archived=false&hapikey=${apiKey}`,
   });
 }
 
@@ -96,33 +112,53 @@ function flattenObject(ob) {
   return toReturn;
 }
 
+function readCsv() {
+  try {
+    const data = fs.readFileSync(importPath, "utf8");
+    return data.split("\n");
+  } catch (err) {
+    console.error("error:", err);
+  }
+}
+
 async function fillUpContacts() {
-  const contacts = await getContacts();
-  const promises = contacts.results.map(async (result) => {
-    // Associations
-    if (!!result.associations && !!result.associations.notes) {
-      result.notes = await getNotes(result.associations.notes.results);
+  const contacts = readCsv();
+  const promises = contacts
+    .filter((e) => e != "")
+    .map(async (id) => {
+      var result = await readContact(id);
+      if (result) {
+        console.log(id);
+      console.log(result);
+      // Associations
+      if (!!result.associations && !!result.associations.notes) {
+        result.notes = await getNotes(result.associations.notes.results);
     }
     if (!!result.associations && !!result.associations.calls) {
       result.calls = await getCalls(result.associations.calls.results);
     }
     if (!!result.associations && !!result.associations.emails) {
-      result.emails = await getEmails(result.associations.emails.results);
+        result.emails = await getEmails(result.associations.emails.results);
+      }
+
+      // // Remove unused keys
+      delete result.properties.createdate;
+      delete result.properties.lastmodifieddate;
+      delete result.properties.hs_object_id;
+      delete result.associations;
+      delete result.archived;
+
+      return flattenObject(result);
     }
-
-    // Remove unused keys
-    delete result.properties.createdate;
-    delete result.properties.lastmodifieddate;
-    delete result.properties.hs_object_id;
-    delete result.associations;
-    delete result.archived;
-
-    return flattenObject(result);
   });
   return Promise.all(promises);
 }
 
+/* END OF FUNCTIONS */
+
 fillUpContacts().then((contacts) => {
+  console.log("Writing CSV...");
+
   console.log(
     util.inspect(contacts, { showHidden: false, depth: null, colors: true })
   );
