@@ -13,6 +13,15 @@ http.globalAgent.maxSockets = 5;
 const apiKey = "";
 const exportPath = "";
 const importPath = "";
+const totalFiles = 22;
+
+function getExportPath(i) {
+  return exportPath + i + ".csv";
+}
+
+function getImportPath(i) {
+  return importPath + i + ".csv";
+}
 
 const hubspotClient = new hubspot.Client({
   apiKey: apiKey,
@@ -26,6 +35,14 @@ async function getContacts() {
   });
 }
 
+function wait(timeout) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, timeout);
+  });
+}
+
 /*
  Wrapper to avoid the API limits
 */
@@ -33,7 +50,7 @@ async function hubspotRequest(request) {
   var response = await hubspotClient.apiRequest(request);
   while (!!response.status && response.status == "error") {
     console.log("¡¡ALERT!! Waiting...");
-    await new Promise((r) => setTimeout(r, 2000));
+    await wait(20000);
     response = await hubspotClient.apiRequest(request);
   }
   return response;
@@ -130,10 +147,10 @@ function flattenObject(ob) {
   return toReturn;
 }
 
-function readCsv() {
+function readCsv(index) {
   console.log("Leyendo CSV");
   try {
-    const data = fs.readFileSync(importPath, "utf8");
+    const data = fs.readFileSync(getImportPath(index), "utf8");
     console.log("Leido!");
     return data.split("\n");
   } catch (err) {
@@ -141,8 +158,8 @@ function readCsv() {
   }
 }
 
-async function fillUpContacts() {
-  const contacts = readCsv();
+async function fillUpContacts(index) {
+  const contacts = readCsv(index);
   console.log("Recibo CSV");
   const promises = contacts
     .filter((e) => e != "")
@@ -172,30 +189,38 @@ async function fillUpContacts() {
         return flattenObject(result);
       }
     });
+
   return Promise.all(promises);
 }
 
 /* END OF FUNCTIONS */
 
-fillUpContacts().then((contacts) => {
-  console.log("Writing CSV...");
+const start = async _ => {
+  for (var index = 2; index <= totalFiles; index++) {
+      const contacts = await fillUpContacts(index);
 
-  // console.log(
-  //   util.inspect(contacts, { showHidden: false, depth: null, colors: true })
-  // );
+        console.log("Writing CSV...");
+        console.log(getExportPath(index));
+        // console.log(
+        //   util.inspect(contacts, { showHidden: false, depth: null, colors: true })
+        // );
 
-  const csv = convertArrayToCSV(contacts);
-  try {
-    fs.writeFileSync(
-      exportPath,
-      csv,
-      {
-        flag: "w+",
+        const csv = convertArrayToCSV(contacts);
+        try {
+          fs.writeFileSync(
+            getExportPath(index),
+            csv,
+            {
+              flag: "w+",
       },
       (err) => {}
     );
     //file written successfully
-  } catch (err) {
-    console.error(err);
+        } catch (err) {
+          console.error(err);
+        }
+
   }
-});
+}
+
+start();
