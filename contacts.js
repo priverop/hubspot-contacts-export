@@ -13,7 +13,9 @@ http.globalAgent.maxSockets = 5;
 const apiKey = "";
 const exportPath = "";
 const importPath = "";
-const totalFiles = 22;
+var totalFiles = 22;
+const startingFile = 8;
+const batch = false;
 
 function getExportPath(i) {
   return exportPath + i + ".csv";
@@ -61,7 +63,7 @@ async function readContact(contact_id) {
 
   return await hubspotRequest({
     method: "GET",
-    path: `/crm/v3/objects/contacts/${contact_id}?associations=notes%2Ccalls%2Cemails&archived=false&hapikey=${apiKey}`,
+    path: `/crm/v3/objects/contacts/${contact_id}?associations=notes%2Ccalls%2Cemails%2Ctasks%2Cmeetings&archived=false&hapikey=${apiKey}`,
   });
 }
 
@@ -92,13 +94,37 @@ async function readEmail(email_id) {
   });
 }
 
+async function readTask(task_id) {
+  if (task_id === "") return false;
+
+  return await hubspotRequest({
+    method: "GET",
+    path: `/crm/v3/objects/tasks/${task_id}?properties=hs_task_body%2Chs_task_subject%2Chs_task_status%2Chs_task_priority&archived=false&hapikey=${apiKey}`,
+  });
+}
+
+async function readMeeting(meeting_id) {
+  if (meeting_id === "") return false;
+
+  return await hubspotRequest({
+    method: "GET",
+    path: `/crm/v3/objects/meetings/${meeting_id}?properties=hs_meeting_title%2Chs_meeting_body&archived=false&hapikey=${apiKey}`,
+  });
+}
+
 /*
   Receives the array of Notes Simple Object and return the array of Full Notes.
   Notes Simple: [{id: '', property: ''}]
  */
 async function getNotes(notes) {
   const promises = notes.map(async (note) => {
-    return await readNote(note.id);
+    const result = await readNote(note.id);
+    result.separator = "|";
+    delete result.archived;
+    delete result.properties.hs_createdate;
+    delete result.properties.hs_lastmodifieddate;
+    delete result.properties.hs_object_id;
+    return result;
   });
   return Promise.all(promises);
 }
@@ -109,7 +135,11 @@ async function getNotes(notes) {
  */
 async function getCalls(calls) {
   const promises = calls.map(async (call) => {
-    return await readCall(call.id);
+    const result = await readCall(call.id);
+    result.separator = "|";
+    delete result.archived;
+    delete result.properties;
+    return result;
   });
   return Promise.all(promises);
 }
@@ -120,7 +150,47 @@ async function getCalls(calls) {
  */
 async function getEmails(emails) {
   const promises = emails.map(async (email) => {
-    return await readEmail(email.id);
+    const result = await readEmail(email.id);
+    result.separator = "|";
+    delete result.archived;
+    delete result.properties.hs_createdate;
+    delete result.properties.hs_lastmodifieddate;
+    delete result.properties.hs_object_id;
+    return result;
+  });
+  return Promise.all(promises);
+}
+
+/*
+  Receives the array of Tasks Simple Object and return the array of Full Tasks.
+  Tasks Simple: [{id: '', property: ''}]
+ */
+async function getTasks(tasks) {
+  const promises = tasks.map(async (task) => {
+    const result = await readTask(task.id);
+    result.separator = "|";
+    delete result.archived;
+    delete result.properties.hs_createdate;
+    delete result.properties.hs_lastmodifieddate;
+    delete result.properties.hs_object_id;
+    return result;
+  });
+  return Promise.all(promises);
+}
+
+/*
+  Receives the array of Meetings Simple Object and return the array of Full Meetings.
+  Meetings Simple: [{id: '', property: ''}]
+ */
+async function getMeetings(meetings) {
+  const promises = meetings.map(async (meeting) => {
+    const result = await readMeeting(meeting.id);
+    result.separator = "|";
+    delete result.archived;
+    delete result.properties.hs_createdate;
+    delete result.properties.hs_lastmodifieddate;
+    delete result.properties.hs_object_id;
+    return result;
   });
   return Promise.all(promises);
 }
@@ -170,14 +240,25 @@ async function fillUpContacts(index) {
         console.log(result);
         // Associations
         if (!!result.associations && !!result.associations.notes) {
+          result.separator_notes = "Notes:";
           result.notes = await getNotes(result.associations.notes.results);
         }
         if (!!result.associations && !!result.associations.calls) {
+          result.separator_calls = "Calls:";
           result.calls = await getCalls(result.associations.calls.results);
         }
         if (!!result.associations && !!result.associations.emails) {
+          result.separator_emails = "Emails:";
           result.emails = await getEmails(result.associations.emails.results);
         }
+        if (!!result.associations && !!result.associations.tasks) {
+          result.separator_tasks = "Tasks:";
+          result.tasks = await getTasks(result.associations.tasks.results);
+        }
+        // if (!!result.associations && !!result.associations.meetings) {
+        //   result.separator_meetings = "Meetings:";
+        //   result.meetings = await getMeetings(result.associations.meetings.results);
+        // }
 
         // // Remove unused keys
         delete result.properties.createdate;
@@ -195,18 +276,21 @@ async function fillUpContacts(index) {
 
 /* END OF FUNCTIONS */
 
-const start = async _ => {
-  for (var index = 2; index <= totalFiles; index++) {
-      const contacts = await fillUpContacts(index);
+const start = async (_) => {
+  // With this, the loop is limited to 1 iteration
+  if (!batch) totalFiles = startingFile;
 
-        console.log("Writing CSV...");
-        console.log(getExportPath(index));
-        // console.log(
-        //   util.inspect(contacts, { showHidden: false, depth: null, colors: true })
-        // );
+  for (var index = startingFile; index <= totalFiles; index++) {
+    const contacts = await fillUpContacts(index);
 
-        const csv = convertArrayToCSV(contacts);
-        try {
+    console.log("Writing CSV...");
+    console.log(getExportPath(index));
+    console.log(
+      util.inspect(contacts, { showHidden: false, depth: null, colors: true })
+    );
+
+    const csv = convertArrayToCSV(contacts);
+    try {
           fs.writeFileSync(
             getExportPath(index),
             csv,
@@ -216,11 +300,10 @@ const start = async _ => {
       (err) => {}
     );
     //file written successfully
-        } catch (err) {
-          console.error(err);
-        }
-
+    } catch (err) {
+      console.error(err);
+    }
   }
-}
+};
 
 start();
